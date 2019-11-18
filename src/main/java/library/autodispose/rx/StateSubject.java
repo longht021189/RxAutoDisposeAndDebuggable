@@ -18,19 +18,18 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class StateSubject extends Subject<ObserverState> {
-    private static final Object[] EMPTY_ARRAY = new Object[0];
-    final AtomicReference<Object> value;
-    final AtomicReference<BehaviorDisposable[]> subscribers;
-    static final BehaviorDisposable[] EMPTY = new BehaviorDisposable[0];
-    static final BehaviorDisposable[] TERMINATED = new BehaviorDisposable[0];
-    final ReadWriteLock lock;
-    final Lock readLock;
-    final Lock writeLock;
-    final AtomicReference<Throwable> terminalEvent;
-    long index;
+    private final AtomicReference<Object> value;
+    private final AtomicReference<BehaviorDisposable[]> subscribers;
+    private static final BehaviorDisposable[] EMPTY = new BehaviorDisposable[0];
+    private static final BehaviorDisposable[] TERMINATED = new BehaviorDisposable[0];
+    private final Lock readLock;
+    private final Lock writeLock;
+    private final AtomicReference<Throwable> terminalEvent;
+    private long index;
 
     public StateSubject() {
-        this.lock = new ReentrantReadWriteLock();
+        ReadWriteLock lock = new ReentrantReadWriteLock();
+
         this.readLock = lock.readLock();
         this.writeLock = lock.writeLock();
         this.subscribers = new AtomicReference<>(EMPTY);
@@ -108,7 +107,7 @@ public class StateSubject extends Subject<ObserverState> {
         return subscribers.get().length != 0;
     }
 
-    int subscriberCount() {
+    private int subscriberCount() {
         return subscribers.get().length;
     }
 
@@ -131,40 +130,6 @@ public class StateSubject extends Subject<ObserverState> {
         return NotificationLite.getValue(o);
     }
 
-    @Deprecated
-    public Object[] getValues() {
-        ObserverState[] a = (ObserverState[])EMPTY_ARRAY;
-        ObserverState[] b = getValues(a);
-        if (b == EMPTY_ARRAY) {
-            return new Object[0];
-        }
-        return b;
-
-    }
-
-    @Deprecated
-    @SuppressWarnings("unchecked")
-    public ObserverState[] getValues(ObserverState[] array) {
-        Object o = value.get();
-        if (o == null || NotificationLite.isComplete(o) || NotificationLite.isError(o)) {
-            if (array.length != 0) {
-                array[0] = null;
-            }
-            return array;
-        }
-        ObserverState v = NotificationLite.getValue(o);
-        if (array.length != 0) {
-            array[0] = v;
-            if (array.length != 1) {
-                array[1] = null;
-            }
-        } else {
-            array = (ObserverState[]) Array.newInstance(array.getClass().getComponentType(), 1);
-            array[0] = v;
-        }
-        return array;
-    }
-
     @Override
     public boolean hasComplete() {
         Object o = value.get();
@@ -182,7 +147,7 @@ public class StateSubject extends Subject<ObserverState> {
         return o != null && !NotificationLite.isComplete(o) && !NotificationLite.isError(o);
     }
 
-    boolean add(BehaviorDisposable rs) {
+    private boolean add(BehaviorDisposable rs) {
         for (;;) {
             BehaviorDisposable[] a = subscribers.get();
             if (a == TERMINATED) {
@@ -199,7 +164,7 @@ public class StateSubject extends Subject<ObserverState> {
         }
     }
 
-    void remove(BehaviorDisposable rs) {
+    private void remove(BehaviorDisposable rs) {
         for (;;) {
             BehaviorDisposable[] a = subscribers.get();
             int len = a.length;
@@ -231,7 +196,7 @@ public class StateSubject extends Subject<ObserverState> {
         }
     }
 
-    BehaviorDisposable[] terminate(Object terminalValue) {
+    private BehaviorDisposable[] terminate(Object terminalValue) {
 
         BehaviorDisposable[] a = subscribers.getAndSet(TERMINATED);
         if (a != TERMINATED) {
@@ -242,14 +207,14 @@ public class StateSubject extends Subject<ObserverState> {
         return a;
     }
 
-    void setCurrent(Object o) {
+    private void setCurrent(Object o) {
         writeLock.lock();
         index++;
         value.lazySet(o);
         writeLock.unlock();
     }
 
-    static final class BehaviorDisposable implements Disposable, AppendOnlyLinkedArrayList.NonThrowingPredicate<Object> {
+    private static final class BehaviorDisposable implements Disposable, AppendOnlyLinkedArrayList.NonThrowingPredicate<Object> {
 
         final Observer<? super ObserverState> downstream;
         final StateSubject state;
