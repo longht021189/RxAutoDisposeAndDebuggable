@@ -24,9 +24,4 @@ public final class StateController {
     Observable<State> getStateObservable() {
         return stateSubject;
     }
-
-    @Nullable
-    State getState() {
-        return stateSubject.getValue();
-    }
 }

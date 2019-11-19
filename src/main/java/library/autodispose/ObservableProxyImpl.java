@@ -1,12 +1,18 @@
 package library.autodispose;
 
 import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.annotations.Nullable;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
+
+import java.util.Stack;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class ObservableProxyImpl<T> implements ObservableProxy<T> {
 
@@ -24,9 +30,15 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         this.controller = controller;
     }
 
-    private Observable<T> nextStream(boolean isStart) {
+    private Observable<T> nextStream(boolean isStart, AtomicReference<ObservableEmitter<State>> emitterReference) {
         if (isStart) {
-            return upstream;
+            return upstream.doOnComplete(() -> {
+                ObservableEmitter<State> emitter = emitterReference.get();
+
+                if (emitter != null && !emitter.isDisposed()) {
+                    emitter.onComplete();
+                }
+            });
         } else {
             return Observable.empty();
         }
@@ -71,20 +83,41 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         ErrorConsumer errorConsumer =
                 new ErrorConsumer(onError, stackTraceElements);
 
-        Observable<State> state = controller
-                .getStateObservable()
+        AtomicReference<Disposable>
+                disposableReference = new AtomicReference<>();
+
+        AtomicReference<ObservableEmitter<State>>
+                emitterReference = new AtomicReference<>();
+
+        Observable<State> state1 = Observable
+                .create(emitter -> {
+                    emitterReference.set(emitter);
+
+                    controller
+                            .getStateObservable()
+                            .subscribe(new StateObserver(emitter, disposableReference));
+                });
+
+        Observable<State> state = state1
                 .distinctUntilChanged()
                 .doOnNext(subscribeConsumer::onStateChanged);
 
         Observable<T> stream = state
                 .map(State::isStart)
                 .distinctUntilChanged()
-                .switchMap(this::nextStream);
+                .switchMap(isStart -> nextStream(isStart, emitterReference));
 
         return Observable
                 .combineLatest(stream, state, Data::new)
                 .filter(this::filterEvent)
                 .map(data -> data.value)
+                .doFinally(() -> {
+                    Disposable disposable = disposableReference.get();
+
+                    if (disposable != null && !disposable.isDisposed()) {
+                        disposable.dispose();
+                    }
+                })
                 .subscribe(new NextConsumer<>(onNext), errorConsumer
                         , new CompleteAction(onComplete), subscribeConsumer);
     }
@@ -182,6 +215,48 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         public void run() throws Exception {
             if (onComplete != null) {
                 onComplete.run();
+            }
+        }
+    }
+
+    private static class StateObserver implements Observer<State> {
+        @NonNull
+        private final ObservableEmitter<State> emitter;
+
+        @NonNull
+        private final AtomicReference<Disposable> disposableReference;
+
+        StateObserver(
+                @NonNull ObservableEmitter<State> emitter,
+                @NonNull AtomicReference<Disposable> disposableReference
+        ) {
+            this.emitter = emitter;
+            this.disposableReference = disposableReference;
+        }
+
+        @Override
+        public void onSubscribe(Disposable d) {
+            disposableReference.set(d);
+        }
+
+        @Override
+        public void onNext(State state) {
+            if (!emitter.isDisposed()) {
+                emitter.onNext(state);
+            }
+        }
+
+        @Override
+        public void onError(Throwable e) {
+            if (!emitter.isDisposed()) {
+                emitter.onError(e);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (!emitter.isDisposed()) {
+                emitter.onComplete();
             }
         }
     }

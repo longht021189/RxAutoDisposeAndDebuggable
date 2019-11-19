@@ -3,6 +3,7 @@ package library.autodispose;
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.functions.Function;
 import org.junit.Test;
 import org.junit.Assert;
 
@@ -25,23 +26,16 @@ public class ObservableTest {
         final Disposable disposable = observable
                 .as(new ObservableConverter<>(controller)).subscribe(result::set);
 
-        Assert.assertNull("Chưa có dispatch state " +
-                "nào nên emitter chưa được khởi tạo", emitterRef.get());
+        Assert.assertNull("It's before Created => Emitter isn't Created", emitterRef.get());
 
         controller.dispatchState(State.Created);
-
-        Assert.assertNotNull("Đã dispatch state Created " +
-                "nên emitter đã được khởi tạo", emitterRef.get());
+        Assert.assertNotNull("It's Created => Emitter is Created", emitterRef.get());
 
         emitterRef.get().onNext(RESULT_VALUE);
-
-        Assert.assertEquals("Vì đang ở state Created " +
-                "nên consumer không nhận giá trị", result.get(), NO_RESULT);
+        Assert.assertEquals("It's Created => Consumer doesn't receive data", result.get(), NO_RESULT);
 
         disposable.dispose();
-
-        Assert.assertTrue("Dù đang ở state Created " +
-                "nhưng stream đã bị dispose bơi manual", emitterRef.get().isDisposed());
+        Assert.assertTrue("It's Created and Dispose Manual", emitterRef.get().isDisposed());
     }
 
     @Test
@@ -58,20 +52,15 @@ public class ObservableTest {
                 .as(new ObservableConverter<>(controller)).subscribe(result::set);
 
         controller.dispatchState(State.Created);
-        emitterRef.get().onNext(RESULT_VALUE);
 
-        Assert.assertEquals("Vì đang ở state Created " +
-                "nên consumer không nhận giá trị", result.get(), NO_RESULT);
+        emitterRef.get().onNext(RESULT_VALUE);
+        Assert.assertEquals("It's Created => Consumer doesn't receive data", result.get(), NO_RESULT);
 
         controller.dispatchState(State.Resumed);
-
-        Assert.assertEquals("Vì đang ở state Resumed " +
-                "nên consumer nhận giá trị", result.get(), RESULT_VALUE);
+        Assert.assertEquals("It's Resumed => Consumer receive data", result.get(), RESULT_VALUE);
 
         disposable.dispose();
-
-        Assert.assertTrue("Dù đang ở state Resumed " +
-                "nhưng stream đã bị dispose bơi manual", emitterRef.get().isDisposed());
+        Assert.assertTrue("It's Resumed and Dispose Manual", emitterRef.get().isDisposed());
     }
 
     @Test
@@ -91,25 +80,17 @@ public class ObservableTest {
         controller.dispatchState(State.Created);
         controller.dispatchState(State.Resumed);
         emitterRef.get().onNext(RESULT_VALUE);
-
-        Assert.assertEquals("Vì đang ở state Resumed " +
-                "nên consumer nhận giá trị", result.get(), RESULT_VALUE);
+        Assert.assertEquals("It's Resumed => Consumer receive data", result.get(), RESULT_VALUE);
 
         controller.dispatchState(State.Paused);
         emitterRef.get().onNext(RESULT_VALUE_2);
-
-        Assert.assertEquals("Vì đang ở state Paused " +
-                "nên consumer không nhận giá trị", result.get(), RESULT_VALUE);
+        Assert.assertEquals("It's Paused => Consumer doesn't receive data", result.get(), RESULT_VALUE);
 
         controller.dispatchState(State.Resumed);
-
-        Assert.assertEquals("Vì trở lại state Resumed " +
-                "nên consumer tiếp tục nhận giá trị tiếp theo", result.get(), RESULT_VALUE_2);
+        Assert.assertEquals("It's Resumed => Consumer receive next data", result.get(), RESULT_VALUE_2);
 
         disposable.dispose();
-
-        Assert.assertTrue("Dù đang ở state Resumed " +
-                "nhưng stream đã bị dispose bơi manual", emitterRef.get().isDisposed());
+        Assert.assertTrue("It's Resumed and Dispose Manual", emitterRef.get().isDisposed());
     }
 
     @Test
@@ -130,19 +111,27 @@ public class ObservableTest {
         emitterRef.get().onNext(RESULT_VALUE);
         controller.dispatchState(State.Destroyed);
 
-        Assert.assertTrue("Đang ở state Destroyed ", emitterRef.get().isDisposed());
-        Assert.assertTrue("Đang ở state Destroyed ", disposable.isDisposed());
+        Assert.assertTrue("It's Destroyed ", emitterRef.get().isDisposed());
+        Assert.assertTrue("It's Destroyed ", disposable.isDisposed());
+
+        boolean isDispatchSuccess = false;
 
         try {
             controller.dispatchState(State.Created);
-            Assert.fail("State Destroyed không thể tiếp dispatchState");
-        } catch (Throwable ignore) { }
+            isDispatchSuccess = true;
+        } catch (Throwable error) {
+            System.out.println(error.toString());
+        }
+
+        if (isDispatchSuccess) {
+            Assert.fail("It's Destroyed, can't call dispatchState");
+        }
 
         final Disposable disposable2 = Observable.never()
                 .as(new ObservableConverter<>(controller))
                 .subscribe(o -> {});
 
-        Assert.assertTrue("Đang ở state Destroyed ", disposable2.isDisposed());
+        Assert.assertTrue("It's Destroyed ", disposable2.isDisposed());
     }
 
     @Test
@@ -160,14 +149,74 @@ public class ObservableTest {
         final Disposable disposable = observable
                 .as(new ObservableConverter<>(controller))
                 .subscribe(result::set, error::set, () -> {
+                    System.out.println("Completed");
                     isComplete.set(true);
                 });
 
         controller.dispatchState(State.Created);
         emitterRef.get().onComplete();
 
-        Assert.assertTrue("Đã complete", emitterRef.get().isDisposed());
-        Assert.assertTrue("Đã complete", disposable.isDisposed());
-        Assert.assertTrue("Đã complete", isComplete.get());
+        try {
+            Thread.sleep(1000L);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        Assert.assertTrue("Completed", emitterRef.get().isDisposed());
+        Assert.assertTrue("Completed", isComplete.get());
+        Assert.assertTrue("Completed", disposable.isDisposed());
     }
+
+    /*@Test
+    public void multiSubscribe() {
+        final Observable<Object> observable = Observable.never();
+        final StateController controller = new StateController();
+
+        observable
+                .as(new ObservableConverter<>(controller))
+                .subscribe(obj -> {});
+
+        boolean isSubscribeSuccess = false;
+
+        try {
+            observable
+                    .as(new ObservableConverter<>(controller))
+                    .subscribe(obj -> {});
+
+            isSubscribeSuccess = true;
+        } catch (Throwable error) {
+            System.out.println(error.toString());
+        }
+
+        if (isSubscribeSuccess) {
+            Assert.fail("It's Subscribed, can't call subscribe");
+        }
+    }
+
+    @Test
+    public void multiSubscribeOnStateCreated() {
+        final Observable<Object> observable = Observable.never();
+        final StateController controller = new StateController();
+
+        observable
+                .as(new ObservableConverter<>(controller))
+                .subscribe(obj -> {});
+
+        boolean isSubscribeSuccess = false;
+        controller.dispatchState(State.Created);
+
+        try {
+            observable
+                    .as(new ObservableConverter<>(controller))
+                    .subscribe(obj -> {});
+
+            isSubscribeSuccess = true;
+        } catch (Throwable error) {
+            System.out.println(error.toString());
+        }
+
+        if (isSubscribeSuccess) {
+            Assert.fail("It's Subscribed, can't call subscribe");
+        }
+    }*/
 }
