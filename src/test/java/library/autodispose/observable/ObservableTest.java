@@ -3,6 +3,7 @@ package library.autodispose.observable;
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.disposables.Disposable;
+import library.autodispose.AutoDispose;
 import library.autodispose.State;
 import library.autodispose.StateController;
 import org.junit.Assert;
@@ -90,7 +91,7 @@ public class ObservableTest {
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller)).subscribe(result::set);
+                .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
         Assert.assertNull("It's before Created => Emitter isn't Created", emitterRef.get());
 
@@ -115,7 +116,7 @@ public class ObservableTest {
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller)).subscribe(result::set);
+                .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
         controller.dispatchState(State.Created);
 
@@ -141,7 +142,7 @@ public class ObservableTest {
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller)).subscribe(result::set);
+                .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
         controller.dispatchState(State.Created);
         controller.dispatchState(State.Resumed);
@@ -170,7 +171,7 @@ public class ObservableTest {
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller)).subscribe(result::set);
+                .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
         controller.dispatchState(State.Created);
         controller.dispatchState(State.Resumed);
@@ -194,7 +195,7 @@ public class ObservableTest {
         }
 
         final Disposable disposable2 = Observable.never()
-                .as(new ObservableConverter<>(controller))
+                .as(AutoDispose.autoDispose(controller))
                 .subscribe(o -> {});
 
         Assert.assertTrue("It's Destroyed ", disposable2.isDisposed());
@@ -213,7 +214,7 @@ public class ObservableTest {
         Observable<Integer> observable = Observable.create(emitterRef::set);
 
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller))
+                .as(AutoDispose.autoDispose(controller))
                 .subscribe(result::set, error::set, () -> {
                     System.out.println("Completed");
                     isComplete.set(true);
@@ -244,7 +245,7 @@ public class ObservableTest {
 
         final Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(new ObservableConverter<>(controller))
+                .as(AutoDispose.autoDispose(controller))
                 .subscribe(result::set, errorRef::set);
 
         controller.dispatchState(State.Created);

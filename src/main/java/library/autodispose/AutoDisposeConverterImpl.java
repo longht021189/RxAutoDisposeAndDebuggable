@@ -1,15 +1,16 @@
-package library.autodispose.observable;
+package library.autodispose;
 
 import io.reactivex.Observable;
 import io.reactivex.annotations.NonNull;
-import library.autodispose.StateController;
+import library.autodispose.observable.ObservableProxy;
+import library.autodispose.observable.ObservableProxyImpl;
 
-final class ObservableConverter<T> implements io.reactivex.ObservableConverter<T, ObservableProxy<T>> {
+final class AutoDisposeConverterImpl<T> implements AutoDisposeConverter<T> {
 
     @NonNull
     private final StateController controller;
 
-    ObservableConverter(StateController controller) {
+    AutoDisposeConverterImpl(StateController controller) {
         this.controller = controller;
     }
 

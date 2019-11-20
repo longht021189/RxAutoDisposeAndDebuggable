@@ -18,7 +18,7 @@ import library.autodispose.StateController;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-final class ObservableProxyImpl<T> implements ObservableProxy<T> {
+public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
 
     @NonNull
     private final Observable<T> upstream;
@@ -26,7 +26,7 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
     @NonNull
     private final StateController controller;
 
-    ObservableProxyImpl(
+    public ObservableProxyImpl(
             @NonNull Observable<T> upstream,
             @NonNull StateController controller
     ) {
