@@ -1,15 +1,16 @@
-package library.autodispose;
+package library.autodispose.observable;
 
+import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.disposables.Disposable;
+import library.autodispose.State;
+import library.autodispose.StateController;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import io.reactivex.Observable;
-import io.reactivex.ObservableEmitter;
-import io.reactivex.disposables.Disposable;
 
 public class ObservableTest {
 

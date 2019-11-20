@@ -1,7 +1,8 @@
-package library.autodispose;
+package library.autodispose.observable;
 
 import io.reactivex.Observable;
 import io.reactivex.annotations.NonNull;
+import library.autodispose.StateController;
 
 final class ObservableConverter<T> implements io.reactivex.ObservableConverter<T, ObservableProxy<T>> {
 

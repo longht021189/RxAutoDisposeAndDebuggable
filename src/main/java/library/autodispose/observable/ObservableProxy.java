@@ -1,4 +1,4 @@
-package library.autodispose;
+package library.autodispose.observable;
 
 import io.reactivex.annotations.NonNull;
 import io.reactivex.disposables.Disposable;

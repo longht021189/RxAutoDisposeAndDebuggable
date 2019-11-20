@@ -22,7 +22,7 @@ public final class StateController {
     }
 
     @NonNull
-    Observable<State> getStateObservable() {
+    public Observable<State> getStateObservable() {
         return stateSubject;
     }
 }

@@ -1,12 +1,9 @@
-package library.autodispose;
-
-import java.util.concurrent.atomic.AtomicReference;
+package library.autodispose.observable;
 
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.annotations.Nullable;
-import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.Exceptions;
@@ -16,6 +13,10 @@ import io.reactivex.internal.disposables.DisposableHelper;
 import io.reactivex.internal.functions.Functions;
 import io.reactivex.observers.LambdaConsumerIntrospection;
 import io.reactivex.plugins.RxJavaPlugins;
+import library.autodispose.State;
+import library.autodispose.StateController;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 final class ObservableProxyImpl<T> implements ObservableProxy<T> {
 

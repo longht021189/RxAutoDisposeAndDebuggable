@@ -1,24 +1,18 @@
 package library.autodispose;
 
 public enum State {
-    Created(1, true),
-    Resumed(2, true),
-    Paused(2, true),
-    Destroyed(3, false);
+    Created(1),
+    Resumed(2),
+    Paused(2),
+    Destroyed(3);
 
     private final int value;
-    private final boolean start;
 
-    State(int value, boolean start) {
+    State(int value) {
         this.value = value;
-        this.start = start;
     }
 
     public int getValue() {
         return value;
-    }
-
-    public boolean isStart() {
-        return start;
     }
 }
