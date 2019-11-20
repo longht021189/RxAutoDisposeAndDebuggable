@@ -1,17 +1,82 @@
 package library.autodispose;
 
-import io.reactivex.Observable;
-import io.reactivex.ObservableEmitter;
-import io.reactivex.disposables.Disposable;
-import io.reactivex.functions.Function;
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.disposables.Disposable;
+
 public class ObservableTest {
+
+    @Test
+    public void testDelaySubscription() {
+        final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
+        final Observable<Integer> observable = Observable.create(emitterRef::set);
+
+        final AtomicReference<ObservableEmitter<Integer>> emitterRef2 = new AtomicReference<>(null);
+        final Observable<Integer> observable2 = Observable.create(emitterRef2::set);
+
+        final Observable<Integer> observable3 = observable.delaySubscription(observable2);
+        final Disposable disposable = observable3.subscribe();
+
+        if (emitterRef.get() == null) {
+            System.out.println("emitterRef == null");
+        } else {
+            System.out.println("emitterRef != null");
+        }
+        if (emitterRef2.get() == null) {
+            System.out.println("emitterDelayRef == null");
+        } else {
+            System.out.println("emitterDelayRef != null");
+
+            emitterRef2.get().onNext(0);
+            if (emitterRef.get() == null) {
+                System.out.println("[onNext] emitterRef == null");
+            } else {
+                System.out.println("[onNext] emitterRef != null");
+
+                emitterRef.get().onComplete();
+                if (emitterRef2.get().isDisposed()) {
+                    System.out.println("[onComplete] emitterDelayRef isDisposed = true");
+                } else {
+                    System.out.println("[onComplete] emitterDelayRef isDisposed = false");
+                }
+                if (emitterRef.get().isDisposed()) {
+                    System.out.println("[onComplete] emitterRef isDisposed = true");
+                } else {
+                    System.out.println("[onComplete] emitterRef isDisposed = false");
+                }
+                if (disposable.isDisposed()) {
+                    System.out.println("[onComplete] disposable isDisposed = true");
+                } else {
+                    System.out.println("[onComplete] disposable isDisposed = false");
+                }
+            }
+        }
+        if (!disposable.isDisposed()) {
+            disposable.dispose();
+        }
+
+        boolean isSubscribedSuccess = false;
+
+        try {
+            observable3.subscribe().dispose();
+            isSubscribedSuccess = true;
+        } catch (Throwable error) {
+            System.out.println(error.toString());
+        }
+
+        if (isSubscribedSuccess) {
+            System.out.println("isSubscribedSuccess = true");
+        } else {
+            System.out.println("isSubscribedSuccess = false");
+        }
+    }
 
     @Test
     public void create() {
@@ -166,57 +231,4 @@ public class ObservableTest {
         Assert.assertTrue("Completed", isComplete.get());
         Assert.assertTrue("Completed", disposable.isDisposed());
     }
-
-    /*@Test
-    public void multiSubscribe() {
-        final Observable<Object> observable = Observable.never();
-        final StateController controller = new StateController();
-
-        observable
-                .as(new ObservableConverter<>(controller))
-                .subscribe(obj -> {});
-
-        boolean isSubscribeSuccess = false;
-
-        try {
-            observable
-                    .as(new ObservableConverter<>(controller))
-                    .subscribe(obj -> {});
-
-            isSubscribeSuccess = true;
-        } catch (Throwable error) {
-            System.out.println(error.toString());
-        }
-
-        if (isSubscribeSuccess) {
-            Assert.fail("It's Subscribed, can't call subscribe");
-        }
-    }
-
-    @Test
-    public void multiSubscribeOnStateCreated() {
-        final Observable<Object> observable = Observable.never();
-        final StateController controller = new StateController();
-
-        observable
-                .as(new ObservableConverter<>(controller))
-                .subscribe(obj -> {});
-
-        boolean isSubscribeSuccess = false;
-        controller.dispatchState(State.Created);
-
-        try {
-            observable
-                    .as(new ObservableConverter<>(controller))
-                    .subscribe(obj -> {});
-
-            isSubscribeSuccess = true;
-        } catch (Throwable error) {
-            System.out.println(error.toString());
-        }
-
-        if (isSubscribeSuccess) {
-            Assert.fail("It's Subscribed, can't call subscribe");
-        }
-    }*/
 }
