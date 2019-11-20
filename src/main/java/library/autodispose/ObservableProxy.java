@@ -26,5 +26,6 @@ public interface ObservableProxy<T> {
             @NonNull Consumer<? super Throwable> onError);
 
     @NonNull
-    Disposable subscribe(@NonNull Consumer<? super T> onNext);
+    Disposable subscribe(
+            @NonNull Consumer<? super T> onNext);
 }

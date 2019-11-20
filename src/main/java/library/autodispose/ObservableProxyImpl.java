@@ -1,12 +1,21 @@
 package library.autodispose;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import io.reactivex.Observable;
+import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.annotations.Nullable;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.exceptions.CompositeException;
+import io.reactivex.exceptions.Exceptions;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
+import io.reactivex.internal.disposables.DisposableHelper;
+import io.reactivex.internal.functions.Functions;
+import io.reactivex.observers.LambdaConsumerIntrospection;
+import io.reactivex.plugins.RxJavaPlugins;
 
 final class ObservableProxyImpl<T> implements ObservableProxy<T> {
 
@@ -57,16 +66,13 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         StackTraceElement[] stackTraceElements =
                 Thread.currentThread().getStackTrace();
 
-        SubscribeConsumer subscribeConsumer =
-                new SubscribeConsumer(onSubscribe);
-
-        ErrorConsumer errorConsumer =
-                new ErrorConsumer(onError, stackTraceElements);
+        ObserverWrapper<T> observer = new ObserverWrapper<>(
+                onNext, onError, onComplete, onSubscribe, stackTraceElements);
 
         Observable<State> state = controller
                 .getStateObservable()
                 .distinctUntilChanged()
-                .doOnNext(subscribeConsumer::onStateChanged);
+                .doOnNext(observer::onStateChanged);
 
         Observable<State> start = state
                 .filter(stateValue -> stateValue != State.Destroyed);
@@ -74,12 +80,13 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         Observable<T> stream = upstream
                 .delaySubscription(start);
 
-        return Observable
+        Observable
                 .combineLatest(stream, state, Data::new)
                 .filter(this::filterEvent)
                 .map(data -> data.value)
-                .subscribe(new NextConsumer<>(onNext), errorConsumer
-                        , new CompleteAction(onComplete), subscribeConsumer);
+                .subscribe(observer);
+
+        return observer;
     }
 
     private static class Data<T> {
@@ -92,89 +99,124 @@ final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         }
     }
 
-    private static class NextConsumer<T> implements Consumer<T> {
+    /**
+     * Copy from io.reactivex.internal.observers.LambdaObserver
+     */
+    private static class ObserverWrapper<T> extends AtomicReference<Disposable> implements Observer<T>, Disposable, LambdaConsumerIntrospection {
+
         @Nullable
         private final Consumer<? super T> onNext;
 
-        NextConsumer(@Nullable Consumer<? super T> onNext) {
-            this.onNext = onNext;
-        }
-
-        @Override
-        public void accept(T t) throws Exception {
-            if (onNext != null) {
-                onNext.accept(t);
-            }
-        }
-    }
-
-    private static class SubscribeConsumer implements Consumer<Disposable> {
-        @Nullable
-        private final Consumer<? super Disposable> onSubscribe;
-
-        private final CompositeDisposable disposables = new CompositeDisposable();
-
-        SubscribeConsumer(@Nullable Consumer<? super Disposable> onSubscribe) {
-            this.onSubscribe = onSubscribe;
-        }
-
-        synchronized void onStateChanged(@NonNull State state) {
-            if (state == State.Destroyed) {
-                disposables.dispose();
-            }
-        }
-
-        @Override
-        public synchronized void accept(Disposable disposable) throws Exception {
-            if (disposables.isDisposed()) {
-                disposable.dispose();
-                return;
-            }
-
-            disposables.add(disposable);
-
-            if (onSubscribe != null) {
-                onSubscribe.accept(disposable);
-            }
-        }
-    }
-
-    private static class ErrorConsumer implements Consumer<Throwable> {
         @Nullable
         private final Consumer<? super Throwable> onError;
+
+        @Nullable
+        private final Action onComplete;
+
+        @Nullable
+        private final Consumer<? super Disposable> onSubscribe;
 
         @NonNull
         private final StackTraceElement[] stackTraceElements;
 
-        ErrorConsumer(@Nullable Consumer<? super Throwable> onError, @NonNull StackTraceElement[] stackTraceElements) {
+        ObserverWrapper(
+                @Nullable Consumer<? super T> onNext, @Nullable Consumer<? super Throwable> onError,
+                @Nullable Action onComplete, @Nullable Consumer<? super Disposable> onSubscribe,
+                @NonNull StackTraceElement[] stackTraceElements
+        ) {
+            super();
+
+            this.onNext = onNext;
             this.onError = onError;
+            this.onComplete = onComplete;
+            this.onSubscribe = onSubscribe;
             this.stackTraceElements = stackTraceElements;
         }
 
         @Override
-        public void accept(Throwable throwable) throws Exception {
-            throwable.setStackTrace(stackTraceElements);
-
-            if (onError != null) {
-                onError.accept(throwable);
-            } else {
-                throw new Exception(throwable);
+        public void onSubscribe(Disposable d) {
+            if (DisposableHelper.setOnce(this, d)) {
+                try {
+                    if (onSubscribe != null) {
+                        onSubscribe.accept(this);
+                    }
+                } catch (Throwable ex) {
+                    Exceptions.throwIfFatal(ex);
+                    d.dispose();
+                    onError(ex);
+                }
             }
-        }
-    }
-
-    private static class CompleteAction implements Action {
-        @Nullable
-        private final Action onComplete;
-
-        CompleteAction(Action onComplete) {
-            this.onComplete = onComplete;
         }
 
         @Override
-        public void run() throws Exception {
-            if (onComplete != null) {
-                onComplete.run();
+        public void onNext(T t) {
+            if (!isDisposed()) {
+                try {
+                    if (onNext != null) {
+                        onNext.accept(t);
+                    }
+                } catch (Throwable e) {
+                    Exceptions.throwIfFatal(e);
+                    get().dispose();
+                    onError(e);
+                }
+            }
+        }
+
+        @Override
+        public void onError(Throwable error) {
+            error.setStackTrace(stackTraceElements);
+
+            if (!isDisposed()) {
+                lazySet(DisposableHelper.DISPOSED);
+                if (onError != null) {
+                    try {
+                        onError.accept(error);
+                    } catch (Throwable e) {
+                        Exceptions.throwIfFatal(e);
+                        RxJavaPlugins.onError(new CompositeException(error, e));
+                    }
+                } else {
+                    RxJavaPlugins.onError(error);
+                }
+            } else {
+                RxJavaPlugins.onError(error);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (!isDisposed()) {
+                lazySet(DisposableHelper.DISPOSED);
+                try {
+                    if (onComplete != null) {
+                        onComplete.run();
+                    }
+                } catch (Throwable e) {
+                    Exceptions.throwIfFatal(e);
+                    RxJavaPlugins.onError(e);
+                }
+            }
+        }
+
+        @Override
+        public void dispose() {
+            DisposableHelper.dispose(this);
+        }
+
+        @Override
+        public boolean isDisposed() {
+            return get() == DisposableHelper.DISPOSED;
+        }
+
+        @Override
+        public boolean hasCustomOnError() {
+            return onError != Functions.ON_ERROR_MISSING;
+        }
+
+        synchronized void onStateChanged(@NonNull State state) {
+            if (state == State.Destroyed) {
+                dispose();
             }
         }
     }

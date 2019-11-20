@@ -231,4 +231,33 @@ public class ObservableTest {
         Assert.assertTrue("Completed", isComplete.get());
         Assert.assertTrue("Completed", disposable.isDisposed());
     }
+
+    @Test
+    public void error() {
+        final int NO_RESULT = -1;
+
+        final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
+        final AtomicReference<Throwable> errorRef = new AtomicReference<>(null);
+        final StateController controller = new StateController();
+        final AtomicInteger result = new AtomicInteger(NO_RESULT);
+
+        final Observable<Integer> observable = Observable.create(emitterRef::set);
+        final Disposable disposable = observable
+                .as(new ObservableConverter<>(controller))
+                .subscribe(result::set, errorRef::set);
+
+        controller.dispatchState(State.Created);
+
+        final Exception exception = new RuntimeException();
+        final StackTraceElement[] stackTraceElements = exception.getStackTrace();
+
+        emitterRef.get().onError(exception);
+
+        Assert.assertTrue("It's Error", emitterRef.get().isDisposed());
+        Assert.assertTrue("It's Error", disposable.isDisposed());
+        Assert.assertNotNull("It's Error", errorRef.get());
+        Assert.assertNotEquals("It's Error", errorRef.get().getStackTrace(), stackTraceElements);
+
+        errorRef.get().printStackTrace(System.out);
+    }
 }
