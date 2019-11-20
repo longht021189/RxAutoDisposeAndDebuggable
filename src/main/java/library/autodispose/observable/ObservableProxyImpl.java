@@ -9,6 +9,7 @@ import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.Exceptions;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
 import io.reactivex.internal.disposables.DisposableHelper;
 import io.reactivex.internal.functions.Functions;
 import io.reactivex.observers.LambdaConsumerIntrospection;
@@ -16,6 +17,8 @@ import io.reactivex.plugins.RxJavaPlugins;
 import library.autodispose.State;
 import library.autodispose.StateController;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
@@ -24,14 +27,29 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
     private final Observable<T> upstream;
 
     @NonNull
-    private final StateController controller;
+    private final List<StateController> controllers;
 
     public ObservableProxyImpl(
             @NonNull Observable<T> upstream,
-            @NonNull StateController controller
+            StateController controller
     ) {
+        ArrayList<StateController> list = new ArrayList<>();
+        list.add(controller);
+
         this.upstream = upstream;
-        this.controller = controller;
+        this.controllers = list;
+    }
+
+    public ObservableProxyImpl(
+            @NonNull Observable<T> upstream,
+            StateController controller, List<StateController> controllers
+    ) {
+        ArrayList<StateController> list = new ArrayList<>();
+        list.add(controller);
+        list.addAll(controllers);
+
+        this.upstream = upstream;
+        this.controllers = list;
     }
 
     private boolean filterEvent(Data<T> data) {
@@ -39,26 +57,50 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
     }
 
     @Override
-    public Disposable subscribe(Consumer<? super T> onNext, Consumer<? super Throwable> onError, Action onComplete, Consumer<? super Disposable> onSubscribe) {
-        return subscribeInternal(onNext, onError, onComplete, onSubscribe);
+    @NonNull
+    public ObservableProxy<T> dependsOn(@NonNull StateController controller) {
+        return new ObservableProxyImpl<>(upstream, controller, controllers);
     }
 
     @Override
-    public Disposable subscribe(Consumer<? super T> onNext, Consumer<? super Throwable> onError, Action onComplete) {
-        return subscribeInternal(onNext, onError, onComplete, null);
+    @NonNull
+    public Disposable subscribe(@NonNull Consumer<? super T> onNext) {
+        return subscribeActual(onNext, null, null, null);
     }
 
     @Override
-    public Disposable subscribe(Consumer<? super T> onNext, Consumer<? super Throwable> onError) {
-        return subscribeInternal(onNext, onError, null, null);
+    @NonNull
+    public Disposable subscribe(
+            @NonNull Consumer<? super T> onNext,
+            @NonNull Consumer<? super Throwable> onError
+    ) {
+        return subscribeActual(onNext, onError, null, null);
     }
 
     @Override
-    public Disposable subscribe(Consumer<? super T> onNext) {
-        return subscribeInternal(onNext, null, null, null);
+    @NonNull
+    public Disposable subscribe(
+            @NonNull Consumer<? super T> onNext,
+            @NonNull Consumer<? super Throwable> onError,
+            @NonNull Action onComplete
+    ) {
+        return subscribeActual(onNext, onError, onComplete, null);
     }
 
-    private Disposable subscribeInternal(
+    @Override
+    @NonNull
+    public Disposable subscribe(
+            @NonNull Consumer<? super T> onNext,
+            @NonNull Consumer<? super Throwable> onError,
+            @NonNull Action onComplete,
+            @NonNull Consumer<? super Disposable> onSubscribe
+    ) {
+        return subscribeActual(onNext, onError, onComplete, onSubscribe);
+    }
+
+    @Override
+    @NonNull
+    public Disposable subscribeActual(
             @Nullable Consumer<? super T> onNext,
             @Nullable Consumer<? super Throwable> onError,
             @Nullable Action onComplete,
@@ -70,8 +112,12 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         ObserverWrapper<T> observer = new ObserverWrapper<>(
                 onNext, onError, onComplete, onSubscribe, stackTraceElements);
 
-        Observable<State> state = controller
-                .getStateObservable()
+        Observable<State> state = Observable
+                .fromIterable(controllers)
+                .map(StateController::getStateObservable)
+                .toList()
+                .toObservable()
+                .flatMap(list -> Observable.combineLatest(list, new Combiner()))
                 .distinctUntilChanged()
                 .doOnNext(observer::onStateChanged);
 
@@ -97,6 +143,14 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         Data(T value, State state) {
             this.value = value;
             this.state = state;
+        }
+    }
+
+    private static class Combiner implements Function<Object[], State> {
+        @Override
+        @NonNull
+        public State apply(Object[] objects) {
+            return null;
         }
     }
 
