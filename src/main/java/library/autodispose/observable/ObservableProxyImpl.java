@@ -15,10 +15,7 @@ import io.reactivex.internal.functions.Functions;
 import io.reactivex.observers.LambdaConsumerIntrospection;
 import io.reactivex.plugins.RxJavaPlugins;
 import library.autodispose.State;
-import library.autodispose.StateController;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
@@ -27,39 +24,18 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
     private final Observable<T> upstream;
 
     @NonNull
-    private final List<StateController> controllers;
+    private final Observable<State> stateObservable;
 
     public ObservableProxyImpl(
             @NonNull Observable<T> upstream,
-            StateController controller
+            @NonNull Observable<State> state
     ) {
-        ArrayList<StateController> list = new ArrayList<>();
-        list.add(controller);
-
         this.upstream = upstream;
-        this.controllers = list;
-    }
-
-    public ObservableProxyImpl(
-            @NonNull Observable<T> upstream,
-            StateController controller, List<StateController> controllers
-    ) {
-        ArrayList<StateController> list = new ArrayList<>();
-        list.add(controller);
-        list.addAll(controllers);
-
-        this.upstream = upstream;
-        this.controllers = list;
+        this.stateObservable = state;
     }
 
     private boolean filterEvent(Data<T> data) {
         return (data.state == State.Resumed);
-    }
-
-    @Override
-    @NonNull
-    public ObservableProxy<T> dependsOn(@NonNull StateController controller) {
-        return new ObservableProxyImpl<>(upstream, controller, controllers);
     }
 
     @Override
@@ -112,12 +88,7 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         ObserverWrapper<T> observer = new ObserverWrapper<>(
                 onNext, onError, onComplete, onSubscribe, stackTraceElements);
 
-        Observable<State> state = Observable
-                .fromIterable(controllers)
-                .map(StateController::getStateObservable)
-                .toList()
-                .toObservable()
-                .flatMap(list -> Observable.combineLatest(list, new Combiner()))
+        Observable<State> state = stateObservable
                 .distinctUntilChanged()
                 .doOnNext(observer::onStateChanged);
 

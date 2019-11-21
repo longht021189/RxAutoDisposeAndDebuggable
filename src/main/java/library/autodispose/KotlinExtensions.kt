@@ -6,8 +6,8 @@ import io.reactivex.functions.Action
 import io.reactivex.functions.Consumer
 import library.autodispose.observable.ObservableProxy
 
-fun <T> Observable<T>.autoDispose(controller: StateController): ObservableProxy<T> {
-    return this.`as`(AutoDispose.autoDispose(controller))
+fun <T> Observable<T>.autoDispose(state: Observable<State>): ObservableProxy<T> {
+    return this.`as`(AutoDispose.autoDispose(state))
 }
 
 fun <T> ObservableProxy<T>.subscribe(

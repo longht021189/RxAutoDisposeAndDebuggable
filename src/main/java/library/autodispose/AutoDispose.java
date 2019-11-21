@@ -1,9 +1,11 @@
 package library.autodispose;
 
+import io.reactivex.Observable;
+
 public final class AutoDispose {
     private AutoDispose() {}
 
-    public static <T> AutoDisposeConverter<T> autoDispose(StateController controller) {
-        return new AutoDisposeConverterImpl<>(controller);
+    public static <T> AutoDisposeConverter<T> autoDispose(Observable<State> state) {
+        return new AutoDisposeConverterImpl<>(state);
     }
 }

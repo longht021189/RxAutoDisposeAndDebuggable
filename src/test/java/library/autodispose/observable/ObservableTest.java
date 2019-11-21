@@ -3,9 +3,9 @@ package library.autodispose.observable;
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.subjects.BehaviorSubject;
 import library.autodispose.AutoDispose;
 import library.autodispose.State;
-import library.autodispose.StateController;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -86,7 +86,7 @@ public class ObservableTest {
         final int RESULT_VALUE = 1;
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
@@ -95,7 +95,7 @@ public class ObservableTest {
 
         Assert.assertNull("It's before Created => Emitter isn't Created", emitterRef.get());
 
-        controller.dispatchState(State.Created);
+        controller.onNext(State.Created);
         Assert.assertNotNull("It's Created => Emitter is Created", emitterRef.get());
 
         emitterRef.get().onNext(RESULT_VALUE);
@@ -111,19 +111,20 @@ public class ObservableTest {
         final int RESULT_VALUE = 1;
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
-                .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
+                .as(AutoDispose.autoDispose(controller))
+                .subscribe(result::set);
 
-        controller.dispatchState(State.Created);
+        controller.onNext(State.Created);
 
         emitterRef.get().onNext(RESULT_VALUE);
         Assert.assertEquals("It's Created => Consumer doesn't receive data", result.get(), NO_RESULT);
 
-        controller.dispatchState(State.Resumed);
+        controller.onNext(State.Resumed);
         Assert.assertEquals("It's Resumed => Consumer receive data", result.get(), RESULT_VALUE);
 
         disposable.dispose();
@@ -137,23 +138,23 @@ public class ObservableTest {
         final int RESULT_VALUE_2 = 2;
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
                 .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
-        controller.dispatchState(State.Created);
-        controller.dispatchState(State.Resumed);
+        controller.onNext(State.Created);
+        controller.onNext(State.Resumed);
         emitterRef.get().onNext(RESULT_VALUE);
         Assert.assertEquals("It's Resumed => Consumer receive data", result.get(), RESULT_VALUE);
 
-        controller.dispatchState(State.Paused);
+        controller.onNext(State.Paused);
         emitterRef.get().onNext(RESULT_VALUE_2);
         Assert.assertEquals("It's Paused => Consumer doesn't receive data", result.get(), RESULT_VALUE);
 
-        controller.dispatchState(State.Resumed);
+        controller.onNext(State.Resumed);
         Assert.assertEquals("It's Resumed => Consumer receive next data", result.get(), RESULT_VALUE_2);
 
         disposable.dispose();
@@ -166,33 +167,20 @@ public class ObservableTest {
         final int RESULT_VALUE = 1;
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
 
         Observable<Integer> observable = Observable.create(emitterRef::set);
         final Disposable disposable = observable
                 .as(AutoDispose.autoDispose(controller)).subscribe(result::set);
 
-        controller.dispatchState(State.Created);
-        controller.dispatchState(State.Resumed);
+        controller.onNext(State.Created);
+        controller.onNext(State.Resumed);
         emitterRef.get().onNext(RESULT_VALUE);
-        controller.dispatchState(State.Destroyed);
+        controller.onNext(State.Destroyed);
 
         Assert.assertTrue("It's Destroyed ", emitterRef.get().isDisposed());
         Assert.assertTrue("It's Destroyed ", disposable.isDisposed());
-
-        boolean isDispatchSuccess = false;
-
-        try {
-            controller.dispatchState(State.Created);
-            isDispatchSuccess = true;
-        } catch (Throwable error) {
-            System.out.println(error.toString());
-        }
-
-        if (isDispatchSuccess) {
-            Assert.fail("It's Destroyed, can't call dispatchState");
-        }
 
         final Disposable disposable2 = Observable.never()
                 .as(AutoDispose.autoDispose(controller))
@@ -206,7 +194,7 @@ public class ObservableTest {
         final int NO_RESULT = -1;
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
         final AtomicReference<Throwable> error = new AtomicReference<>();
         final AtomicBoolean isComplete = new AtomicBoolean(false);
@@ -220,11 +208,11 @@ public class ObservableTest {
                     isComplete.set(true);
                 });
 
-        controller.dispatchState(State.Created);
+        controller.onNext(State.Created);
         emitterRef.get().onComplete();
 
         try {
-            Thread.sleep(1000L);
+            Thread.sleep(200L);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -240,7 +228,7 @@ public class ObservableTest {
 
         final AtomicReference<ObservableEmitter<Integer>> emitterRef = new AtomicReference<>(null);
         final AtomicReference<Throwable> errorRef = new AtomicReference<>(null);
-        final StateController controller = new StateController();
+        final BehaviorSubject<State> controller = BehaviorSubject.create();
         final AtomicInteger result = new AtomicInteger(NO_RESULT);
 
         final Observable<Integer> observable = Observable.create(emitterRef::set);
@@ -248,7 +236,7 @@ public class ObservableTest {
                 .as(AutoDispose.autoDispose(controller))
                 .subscribe(result::set, errorRef::set);
 
-        controller.dispatchState(State.Created);
+        controller.onNext(State.Created);
 
         final Exception exception = new RuntimeException();
         final StackTraceElement[] stackTraceElements = exception.getStackTrace();

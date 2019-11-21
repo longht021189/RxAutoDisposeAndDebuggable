@@ -5,7 +5,6 @@ import io.reactivex.annotations.Nullable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
-import library.autodispose.StateController;
 
 public interface ObservableProxy<T> {
 
@@ -37,8 +36,4 @@ public interface ObservableProxy<T> {
     @NonNull
     Disposable subscribe(
             @NonNull Consumer<? super T> onNext);
-
-    @NonNull
-    ObservableProxy<T> dependsOn(
-            @NonNull StateController controller);
 }
