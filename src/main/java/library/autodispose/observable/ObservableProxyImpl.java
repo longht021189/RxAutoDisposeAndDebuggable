@@ -9,7 +9,6 @@ import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.Exceptions;
 import io.reactivex.functions.Action;
 import io.reactivex.functions.Consumer;
-import io.reactivex.functions.Function;
 import io.reactivex.internal.disposables.DisposableHelper;
 import io.reactivex.internal.functions.Functions;
 import io.reactivex.observers.LambdaConsumerIntrospection;
@@ -114,14 +113,6 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         Data(T value, State state) {
             this.value = value;
             this.state = state;
-        }
-    }
-
-    private static class Combiner implements Function<Object[], State> {
-        @Override
-        @NonNull
-        public State apply(Object[] objects) {
-            return null;
         }
     }
 
