@@ -1,9 +1,9 @@
 package library.autodispose;
 
+import javax.validation.constraints.Size;
+
 import io.reactivex.Observable;
 import io.reactivex.annotations.NonNull;
-
-import javax.validation.constraints.Size;
 
 public final class AutoDispose {
     private AutoDispose() {}
@@ -20,7 +20,7 @@ public final class AutoDispose {
 
     @NonNull
     private static Observable<State> merge(Observable<State>[] states, int index) {
-        return states[index].flatMap(value -> {
+        return states[index].distinctUntilChanged().switchMap(value -> {
             if (index + 1 >= states.length) {
                 return Observable.just(value);
             } else {

@@ -1,9 +1,13 @@
 package library.autodispose.observable;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.concurrent.atomic.AtomicReference;
+
 import io.reactivex.Observable;
 import io.reactivex.Observer;
 import io.reactivex.annotations.NonNull;
-import io.reactivex.annotations.Nullable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.exceptions.CompositeException;
 import io.reactivex.exceptions.Exceptions;
@@ -14,8 +18,6 @@ import io.reactivex.internal.functions.Functions;
 import io.reactivex.observers.LambdaConsumerIntrospection;
 import io.reactivex.plugins.RxJavaPlugins;
 import library.autodispose.State;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
 
@@ -37,50 +39,11 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
         return (data.state == State.Resumed);
     }
 
+    @NotNull
     @Override
-    @NonNull
-    public Disposable subscribe(@NonNull Consumer<? super T> onNext) {
-        return subscribeActual(onNext, null, null, null);
-    }
-
-    @Override
-    @NonNull
     public Disposable subscribe(
-            @NonNull Consumer<? super T> onNext,
-            @NonNull Consumer<? super Throwable> onError
-    ) {
-        return subscribeActual(onNext, onError, null, null);
-    }
-
-    @Override
-    @NonNull
-    public Disposable subscribe(
-            @NonNull Consumer<? super T> onNext,
-            @NonNull Consumer<? super Throwable> onError,
-            @NonNull Action onComplete
-    ) {
-        return subscribeActual(onNext, onError, onComplete, null);
-    }
-
-    @Override
-    @NonNull
-    public Disposable subscribe(
-            @NonNull Consumer<? super T> onNext,
-            @NonNull Consumer<? super Throwable> onError,
-            @NonNull Action onComplete,
-            @NonNull Consumer<? super Disposable> onSubscribe
-    ) {
-        return subscribeActual(onNext, onError, onComplete, onSubscribe);
-    }
-
-    @Override
-    @NonNull
-    public Disposable subscribeActual(
-            @Nullable Consumer<? super T> onNext,
-            @Nullable Consumer<? super Throwable> onError,
-            @Nullable Action onComplete,
-            @Nullable Consumer<? super Disposable> onSubscribe
-    ) {
+            @Nullable Consumer<? super T> onNext, @Nullable Consumer<? super Throwable> onError,
+            @Nullable Action onComplete, @Nullable Consumer<? super Disposable> onSubscribe) {
         StackTraceElement[] stackTraceElements =
                 Thread.currentThread().getStackTrace();
 
