@@ -7,8 +7,11 @@ import io.reactivex.functions.Consumer
 interface ObservableProxy<T> {
 
     fun subscribe(
-            onNext: Consumer<in T?>? = null,
-            onError: Consumer<in Throwable?>? = null,
+            onNext: Consumer<T>? = null,
+            onError: Consumer<Throwable>? = null,
             onComplete: Action? = null,
-            onSubscribe: Consumer<in Disposable?>? = null): Disposable
+            onSubscribe: Consumer<Disposable>? = null): Disposable
+
+    fun doOnSubscribe(
+            onSubscribe: Consumer<Disposable>): ObservableProxy<T>
 }

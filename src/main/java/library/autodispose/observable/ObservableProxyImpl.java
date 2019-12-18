@@ -42,8 +42,9 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
     @NotNull
     @Override
     public Disposable subscribe(
-            @Nullable Consumer<? super T> onNext, @Nullable Consumer<? super Throwable> onError,
-            @Nullable Action onComplete, @Nullable Consumer<? super Disposable> onSubscribe) {
+            @Nullable Consumer<T> onNext, @Nullable Consumer<Throwable> onError,
+            @Nullable Action onComplete, @Nullable Consumer<Disposable> onSubscribe
+    ) {
         StackTraceElement[] stackTraceElements =
                 Thread.currentThread().getStackTrace();
 
@@ -67,6 +68,12 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
                 .subscribe(observer);
 
         return observer;
+    }
+
+    @NotNull
+    @Override
+    public ObservableProxy<T> doOnSubscribe(@NotNull Consumer<Disposable> onSubscribe) {
+        return new DoOnSubscribe<>(this, onSubscribe);
     }
 
     private static class Data<T> {
@@ -198,6 +205,54 @@ public final class ObservableProxyImpl<T> implements ObservableProxy<T> {
             if (state == State.Destroyed) {
                 dispose();
             }
+        }
+    }
+
+    private static class Merged implements Consumer<Disposable> {
+
+        private final Consumer<Disposable> consumer1;
+
+        @Nullable
+        private final Consumer<Disposable> consumer2;
+
+        Merged(Consumer<Disposable> consumer1, @Nullable Consumer<Disposable> consumer2) {
+            this.consumer1 = consumer1;
+            this.consumer2 = consumer2;
+        }
+
+        @Override
+        public void accept(Disposable disposable) throws Exception {
+            consumer1.accept(disposable);
+
+            if (consumer2 != null) {
+                consumer2.accept(disposable);
+            }
+        }
+    }
+
+    private static class DoOnSubscribe<T> implements ObservableProxy<T> {
+
+        private final ObservableProxy<T> origin;
+        private final Consumer<Disposable> consumer;
+
+        DoOnSubscribe(ObservableProxy<T> origin, Consumer<Disposable> consumer) {
+            this.origin = origin;
+            this.consumer = consumer;
+        }
+
+        @NotNull
+        @Override
+        public Disposable subscribe(
+                @Nullable Consumer<T> onNext, @Nullable Consumer<Throwable> onError,
+                @Nullable Action onComplete, @Nullable Consumer<Disposable> onSubscribe
+        ) {
+            return origin.subscribe(onNext, onError, onComplete, new Merged(consumer, onSubscribe));
+        }
+
+        @NotNull
+        @Override
+        public ObservableProxy<T> doOnSubscribe(@NotNull Consumer<Disposable> onSubscribe) {
+            return new DoOnSubscribe<>(this, onSubscribe);
         }
     }
 }
